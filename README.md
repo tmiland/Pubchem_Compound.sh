@@ -33,6 +33,10 @@ chmod +x pubchem_compound.sh
 ln -sfn ~/path/to/folder/pubchem_compound.sh ~/.local/bin/pubchem_compound
 ```
 
+### Dependencies
+```bash
+curl jq
+```
 ### Example output
 ```bash
 ./pubchem_compound.sh "2519"

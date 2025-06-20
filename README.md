@@ -14,7 +14,7 @@ Or
 
 ### Installation
 
-- From Master
+From Master
   ```bash
   curl -sSL https://raw.githubusercontent.com/tmiland/Pubchem_Compound.sh/refs/heads/main/pubchem_compound.sh > pubchem_compound.sh && \
   chmod +x pubchem_compound.sh

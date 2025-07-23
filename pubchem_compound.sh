@@ -57,30 +57,30 @@ then
   COMPOUND_CID="$1"
   # remove trailing whitespace characters
   COMPOUND_CID="${COMPOUND_CID%"${COMPOUND_CID##*[![:space:]]}"}"
-else
-  COMPOUND_NAME="$1"
-  # Replace spaces in name with url encoded %20 (Newer version of curl doesn't accept spaces)
-  COMPOUND_NAME="${COMPOUND_NAME// /%20}"
-
-  COMPOUND_NAME_API_URL="https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${COMPOUND_NAME}/JSON"
-
-  COMPOUND_NAME_RESPONSE=$(curl_cmd "$COMPOUND_NAME_API_URL")
-
-  # Check if the response is valid
-  if [[ -z "$COMPOUND_NAME_RESPONSE" ]]
-  then
-    echo "Error: Failed to fetch cid data from PubChem API."
-    exit 1
-  fi
-  # Check if cid is found
-  if echo "$COMPOUND_NAME_RESPONSE" | grep -q "No CID found"
-  then
-    echo "Error: No CID found that matches the given name."
-    exit 1
-  fi
-  # Define the compound CID (PubChem Compound ID) from API
-  COMPOUND_CID=$(echo "$COMPOUND_NAME_RESPONSE" | jq -r '.PC_Compounds[].id.id.cid')
 fi
+COMPOUND_NAME="$1"
+# Replace spaces in name with url encoded %20 (Newer version of curl doesn't accept spaces)
+COMPOUND_NAME="${COMPOUND_NAME// /%20}"
+
+COMPOUND_NAME_API_URL="https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${COMPOUND_NAME}/JSON"
+
+COMPOUND_NAME_RESPONSE=$(curl_cmd "$COMPOUND_NAME_API_URL")
+
+# Check if the response is valid
+if [[ -z "$COMPOUND_NAME_RESPONSE" ]]
+then
+  echo "Error: Failed to fetch cid data from PubChem API."
+  exit 1
+fi
+# Check if cid is found
+if echo "$COMPOUND_NAME_RESPONSE" | grep -q "No CID found"
+then
+  echo "Error: No CID found that matches the given name."
+  exit 1
+fi
+# Define the compound CID (PubChem Compound ID) from API
+COMPOUND_CID=$(echo "$COMPOUND_NAME_RESPONSE" | jq -r '.PC_Compounds[].id.id.cid')
+
 # Fetch compound data from NCBI PubChem API in JSON format
 COMPOUND_CID_API_URL="https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/${COMPOUND_CID}/JSON"
 
@@ -100,6 +100,10 @@ gmol_json() {
 
 formula_json() {
   jq -r '.Record.Section[] | select(.TOCHeading == "'"$1"'") | .Section[] | select(.TOCHeading == "'"$2"'") | try.Information[0].Value.StringWithMarkup[].String'
+}
+
+sequence_json() {
+  jq -r '.Record.Section[] | select(.TOCHeading == "'"$1"'") | .Section[] | select(.TOCHeading == "'"$2"'") | try.Information[1].Value.StringWithMarkup[].String'
 }
 
 name_id_json() {
@@ -125,6 +129,8 @@ MOLECULAR_WEIGHT=$(echo "$COMPOUND_CID_RESPONSE" | gmol_json "Chemical and Physi
 
 MOLECULAR_FORMULA=$(echo "$COMPOUND_CID_RESPONSE" | formula_json "Names and Identifiers" "Molecular Formula")
 
+SEQUENCE=$(echo "$COMPOUND_CID_RESPONSE" | sequence_json "Biologic Description" "Biologic Line Notation")
+
 SMILES=$(echo "$COMPOUND_CID_RESPONSE" | name_id_json "Names and Identifiers" "Computed Descriptors" "SMILES")
 
 DESCRIPTION=$(echo "$COMPOUND_CID_RESPONSE" | phar_bio_json "Pharmacology and Biochemistry" "Pharmacodynamics")
@@ -138,7 +144,7 @@ URL=$(echo "$COMPOUND_CID_RESPONSE" | url_json "Pharmacology and Biochemistry" "
 if [[ ${2} == "csv" ]]
 then
   echo "Name,CID,Molecular Weight,Molecular Formula,SMILES,Description,Information,Link"
-  echo "$COMPOUND_NAME,$COMPOUND_CID,$MOLECULAR_WEIGHT,$MOLECULAR_FORMULA,$SMILES,$DESCRIPTION,$INFORMATION,$URL"
+  echo "$COMPOUND_NAME,$COMPOUND_CID,$MOLECULAR_WEIGHT,$MOLECULAR_FORMULA,$SEQUENCE,$SMILES,$DESCRIPTION,$INFORMATION,$URL"
 else
   # Display the extracted information
   printf 'Name: %s\n\n' "$COMPOUND_NAME"
@@ -149,6 +155,10 @@ else
   if [ -n "$MOLECULAR_FORMULA" ]
   then
     printf 'Molecular Formula: %s\n\n' "$MOLECULAR_FORMULA"
+  fi
+  if [ -n "$SEQUENCE" ]
+  then
+    printf 'Sequence: %s\n\n' "$SEQUENCE"
   fi
   if [ -n "$SMILES" ]
   then
